@@ -6,6 +6,9 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.Message;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
@@ -41,22 +44,20 @@ import java.util.List;
 
 public class EdgeDetection extends AppCompatActivity implements CameraBridgeViewBase.CvCameraViewListener2 {
 
+
+    @Nullable
+    private AsyncTask<Void, Void, Boolean> textDetectAsyncTask;
+
     private TesseractOCR mTessOCR;
 
-    private TextView textView;
     //private final OcrDetectorListener ocrDetectorListener;
     private TextRecognizer textRecognizer;
 
     private GraphicOverlay<OcrGraphic> graphicOverlay;
 
-
-    /*public EdgeDetection(@NonNull OcrDetectorProcessor.OcrDetectorListener ocrDetectorListener) {
-        this.ocrDetectorListener = (OcrDetectorListener) ocrDetectorListener;
-    }*/
-
-    private TextView mTextView;
+    private TextView textViewValue;
     private static Scalar CONTOUR_COLOR = null;
-    private static double areaThreshold = 0.025; //threshold for the area size of an object
+    private static double areaThreshold = 1.025; //threshold for the area size of an object
     private static final String TAG = "EdgeDetection";
     private CameraBridgeViewBase cameraBridgeViewBase;
     private CameraBridgeViewBase.CvCameraViewListener2 cameraViewListener;
@@ -76,11 +77,12 @@ public class EdgeDetection extends AppCompatActivity implements CameraBridgeView
         }
     };
 
-    @Nullable
-    private AsyncTask<Void, Void, Boolean> textDetectAsyncTask;
 
     private void doOCR(final Bitmap bitmap) {
-        String text = mTessOCR.getOCRResult(bitmap);
+        if (mTessOCR.getOCRResult(bitmap) != null) {
+            String text = mTessOCR.getOCRResult(bitmap);
+        }
+
     }
 
     public static Intent newIntent(@NonNull Context context) {
@@ -91,6 +93,7 @@ public class EdgeDetection extends AppCompatActivity implements CameraBridgeView
         Intent starter = new Intent(context, EdgeDetection.class);
         context.startActivity(starter);
     }
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -106,18 +109,19 @@ public class EdgeDetection extends AppCompatActivity implements CameraBridgeView
         graphicOverlay = (GraphicOverlay<OcrGraphic>) findViewById(R.id.graphicOverlay);
         textRecognizer = new TextRecognizer.Builder(this).build();
         //      mTessOCR = new TesseractOCR(this);
-//        textView = findViewById(R.id.textView);
+        textViewValue = findViewById(R.id.text_value);
 
     }
 
     @Override
     public void onPause() {
         super.onPause();
-        if (cameraBridgeViewBase != null)
+
+        textDetectAsyncTask.cancel(true);
+
+        if (cameraBridgeViewBase != null) {
             cameraBridgeViewBase.disableView();
 
-        if (textDetectAsyncTask != null) {
-            textDetectAsyncTask.cancel(true);
         }
     }
 
@@ -135,8 +139,12 @@ public class EdgeDetection extends AppCompatActivity implements CameraBridgeView
 
     public void onDestroy() {
         super.onDestroy();
-        if (cameraBridgeViewBase != null)
+        textDetectAsyncTask.cancel(true);
+
+
+        if (cameraBridgeViewBase != null) {
             cameraBridgeViewBase.disableView();
+        }
 
     }
 
@@ -157,10 +165,10 @@ public class EdgeDetection extends AppCompatActivity implements CameraBridgeView
 
     @Override
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
-        Mat color = inputFrame.rgba();
-        Mat edges = inputFrame.gray();
+        final Mat color = inputFrame.rgba();
+        final Mat edges = inputFrame.gray();
         Mat hierarchy = new Mat();
-        List<MatOfPoint> contours = new ArrayList<MatOfPoint>();
+        final List<MatOfPoint> contours = new ArrayList<MatOfPoint>();
 
         //  detectEdges(edges.getNativeObjAddr());
 
@@ -200,37 +208,40 @@ public class EdgeDetection extends AppCompatActivity implements CameraBridgeView
                 final MatOfPoint points = new MatOfPoint(approxCurve.toArray());
                 final Rect rect = Imgproc.boundingRect(points);
 
-                textDetectAsyncTask = new TextDetectAsyncTask(contours, color, edges, rect).execute();
+
+                textDetectAsyncTask = new TextDetectAsyncTask(contours, color, edges, rect);
+                textDetectAsyncTask.execute();
 
 
-                //TESSERACT DENEMESİ
-                /*Bitmap bitMap = null;
-                StringBuilder sb = new StringBuilder();
-                //crop = cameraViewListener.onCameraFrame(inputFrame);
-                for(int j = 0; j < contours.size(); j++) {
-                    try {
-                        Point bottomRight = rect.br();
-                        Point topLeft = rect.tl();
-                        Mat subImage = color.submat((int) topLeft.y, (int) bottomRight.y, (int) topLeft.x, (int) bottomRight.x);
-                        bitMap = Bitmap.createBitmap(subImage.width(), subImage.height(), Bitmap.Config.ARGB_8888);
-                        Utils.matToBitmap(subImage, bitMap);
-                    } catch (Exception e) {
-                        Log.d(TAG,"Cropped part error");
-                    }
-                    if(bitMap != null) {
-                        doOCR(bitMap);
-                    }
-                }
+                /**
 
-        /*for (int contourIdx=0; contourIdx < contours.size(); contourIdx++ ) {
-            // Minimum size allowed for consideration
-            MatOfPoint2f approxCurve = new MatOfPoint2f();
-            MatOfPoint2f contour2f = new MatOfPoint2f(contours.get(contourIdx).toArray());
-            //Processing on mMOP2f1 which is in type MatOfPoint2f
-            double approxDistance = Imgproc.arcLength(contour2f, true) * 0.02;
-            Imgproc.approxPolyDP(contour2f, approxCurve, approxDistance, true);
+                 //TESSERACT DENEMESİ
+                 Bitmap bitMap = null;
+                 StringBuilder sb = new StringBuilder();
+                 //crop = cameraViewListener.onCameraFrame(inputFrame);
+                 for (int j = 0; j < contours.size(); j++) {
+                 try {
+                 Point bottomRight = rect.br();
+                 Point topLeft = rect.tl();
+                 Mat subImage = color.submat((int) topLeft.y, (int) bottomRight.y, (int) topLeft.x, (int) bottomRight.x);
+                 bitMap = Bitmap.createBitmap(subImage.width(), subImage.height(), Bitmap.Config.ARGB_8888);
+                 Utils.matToBitmap(subImage, bitMap);
+                 } catch (Exception e) {
+                 Log.d(TAG, "Cropped part error");
+                 }
+                 if (bitMap != null) {
+                 doOCR(bitMap);
+                 }
+                 }
 
-        }
+                 for (int contourIdx = 0; contourIdx < contours.size(); contourIdx++) {
+                 // Minimum size allowed for consideration
+                 MatOfPoint2f contour2f = new MatOfPoint2f(contours.get(contourIdx).toArray());
+                 //Processing on mMOP2f1 which is in type MatOfPoint2f
+                 double approxDistance = Imgproc.arcLength(contour2f, true) * 0.02;
+                 Imgproc.approxPolyDP(contour2f, approxCurve, approxDistance, true);
+
+                 }*/
         /*Mat lines = new Mat();
         Mat edgesp = edges.clone();
         Imgproc.cvtColor(edges, edgesp, Imgproc.COLOR_GRAY2BGR);
@@ -280,8 +291,11 @@ public class EdgeDetection extends AppCompatActivity implements CameraBridgeView
             for (int j = 0; j < contours.size(); j++) {
                 Point bottomRight = rect.br();
                 Point topLeft = rect.tl();
+
+
                 Mat subImage = color.submat((int) topLeft.y, (int) bottomRight.y, (int) topLeft.x, (int) bottomRight.x);
                 if (subImage.width() > 0 && subImage.height() > 0) {
+
                     Bitmap bitMap = Bitmap.createBitmap(subImage.width(), subImage.height(), Bitmap.Config.ARGB_8888);
                     Utils.matToBitmap(subImage, bitMap);
                     Frame frame = new Frame.Builder().setBitmap(bitMap).build();
@@ -290,14 +304,28 @@ public class EdgeDetection extends AppCompatActivity implements CameraBridgeView
                     if (items != null) {
                         int size = items.size();
                         for (int i = 0; i < size; ++i) {
-                            TextBlock item = items.valueAt(i);
+                            final TextBlock item = items.valueAt(i);
                             if (item != null) {
 
                                 Log.d("OcrDetectorProcessor", "Text detected! " + item.getValue());
                                 OcrGraphic graphic = new OcrGraphic(graphicOverlay, item);
                                 graphicOverlay.add(graphic);
 
-                                Toast.makeText(EdgeDetection.this, item.getValue(), Toast.LENGTH_SHORT).show();
+
+                                runOnUiThread(new Runnable() {
+                                    @Override
+                                    public void run() {
+
+
+                                        new Handler().postDelayed(new Runnable() {
+                                            @Override
+                                            public void run() {
+                                                textViewValue.setText(item.getValue());
+                                            }
+                                        }, 2000);
+
+                                    }
+                                });
 
                                 /**
                                  List<? extends Text> textComponents = item.getComponents();

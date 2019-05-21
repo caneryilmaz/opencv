@@ -14,7 +14,9 @@ import android.util.SparseArray;
 import android.view.SurfaceView;
 import android.view.WindowManager;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import com.google.android.gms.common.util.CollectionUtils;
 import com.google.android.gms.vision.Frame;
 import com.google.android.gms.vision.text.Text;
 import com.google.android.gms.vision.text.TextBlock;
@@ -103,7 +105,7 @@ public class EdgeDetection extends AppCompatActivity implements CameraBridgeView
         cameraBridgeViewBase.setCvCameraViewListener(this);
         graphicOverlay = (GraphicOverlay<OcrGraphic>) findViewById(R.id.graphicOverlay);
         textRecognizer = new TextRecognizer.Builder(this).build();
-        //  mTessOCR = new TesseractOCR(this);
+        //      mTessOCR = new TesseractOCR(this);
 //        textView = findViewById(R.id.textView);
 
     }
@@ -290,13 +292,25 @@ public class EdgeDetection extends AppCompatActivity implements CameraBridgeView
                         for (int i = 0; i < size; ++i) {
                             TextBlock item = items.valueAt(i);
                             if (item != null) {
-                                List<? extends Text> textComponents = item.getComponents();
-                                //for (Text currentText : textComponents) {
-                                //if (CollectionUtils.isNotEmpty(textComponents)) {
-                                Log.i("OcrDetectorProcessor", "Text detected! " + textComponents.get(i));
+
+                                Log.d("OcrDetectorProcessor", "Text detected! " + item.getValue());
                                 OcrGraphic graphic = new OcrGraphic(graphicOverlay, item);
                                 graphicOverlay.add(graphic);
 
+                                Toast.makeText(EdgeDetection.this, item.getValue(), Toast.LENGTH_SHORT).show();
+
+                                /**
+                                 List<? extends Text> textComponents = item.getComponents();
+
+                                 for (Text currentText : textComponents) {
+                                 if (!CollectionUtils.isEmpty(textComponents)) {
+                                 Log.d("OcrDetectorProcessor", "Text detected! " + currentText);
+                                 OcrGraphic graphic = new OcrGraphic(graphicOverlay, item);
+                                 graphicOverlay.add(graphic);
+
+                                 }
+                                 }
+                                 */
                             }
                         }
                     }
